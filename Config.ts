@@ -139,6 +139,11 @@ export const CHATGPT    = config_path(config_get("chatgpt", DIR + "/chatgpt.json
 export const CLAUDE_SUB = config_path(config_get("claude_sub", DIR + "/claude-sub"));
 export const CLAUDE     = config_path(config_get("claude", ""));
 
+// the dir a chat's turns and subagents run claude-sub's Claude Code in,
+// on the user's own setup there (ClaudeSub.own: its settings, rules,
+// plugins, skills, MCP servers); "": none, Claude Code bare
+export const CLAUDE_HOME = config_path(config_get("claude_home", ""));
+
 // the keys the environment gave (removed from it), and every key as used:
 // the environment's, else keys.json's
 const ENV_KEYS: Record<string, string> = Object.fromEntries(Object.entries(VARS).map(([name, v]) => [name, config_key(v)]));

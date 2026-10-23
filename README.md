@@ -183,6 +183,12 @@ Settings page). Each may also be set as `UNII_<KEY>`, which wins. Besides
   Add `"device": "<name>"` to run one on a device.
 - `after`: a shell command run after each turn.
 - `claude_sub`, `claude`, `chatgpt`: where the plans' sign-ins are kept.
+- `claude_home`: a dir where claude-sub runs the chat's turns and
+  subagents on your own Claude Code setup there (settings, CLAUDE.md and
+  rules, plugins, skills, MCP servers, claude.ai connectors); summaries
+  stay bare. Those calls use your own Claude Code sign-in and config
+  (~/.claude), not `claude_sub`; set `claude` to your own `claude` so
+  its plugins run on the version they were installed for.
 - `apple`, `apns`: the iOS app's (ios/) App ID and push key id.
 - `task_stall`: hours a task of Unii's may stand still, with no
   `next_due`, before it's overdue (4 by default; read at the start).

@@ -81,6 +81,10 @@ const WEB = ["WebSearch"];
 // names it lacks
 const MORE = ["Task", "DesignSync"];
 
+// what a call on the user's own setup (config `claude_home`) keeps too:
+// its skills, and the search that loads its MCP servers' deferred tools
+const OWN = ["Skill", "ToolSearch"];
+
 // what turns off what Claude Code does beyond calling the model
 const ENV = {
   CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC : "1", // updates, telemetry, error reports
@@ -236,11 +240,27 @@ export namespace ClaudeSub {
   // its environment: ours, less what would sign it in or send it
   // elsewhere (an API key, a token, a base URL, Bedrock, Vertex...)
   // (its config dir made, or kept, its owner's alone)
-  export function env(): Record<string, string | undefined> {
+  // on the user's own setup (own), its config dir is the user's own
+  // (~/.claude and ~/.claude.json: its MCP servers, plugins, sign-in), and
+  // its auto memory stays on: the project's memory is read as the user's
+  // Claude Code reads it
+  export function env(own = false): Record<string, string | undefined> {
     fs.mkdirSync(DIR, { recursive: true, mode: 0o700 });
     fs.chmodSync(DIR, 0o700);
     const ours = Object.entries(process.env).filter(([k]) => !/^(ANTHROPIC_|CLAUDE_)/.test(k));
-    return { ...Object.fromEntries(ours), ...ENV, CLAUDE_CONFIG_DIR: DIR };
+    const env: Record<string, string | undefined> = { ...Object.fromEntries(ours), ...ENV, CLAUDE_CONFIG_DIR: DIR };
+    if (own) {
+      delete env.CLAUDE_CONFIG_DIR;
+      delete env.CLAUDE_CODE_DISABLE_AUTO_MEMORY;
+    }
+    return env;
+  }
+
+  // whether a call runs on the user's own setup: config `claude_home` set,
+  // and a chat's turn or a subagent's (never a summary's or an import's,
+  // which see only the text they compress)
+  export function own(ask: Ask): boolean {
+    return config.CLAUDE_HOME !== "" && ask.patient !== true;
   }
 
 
@@ -301,13 +321,21 @@ export namespace ClaudeSub {
   // search, and a call may run past the 60 s Claude Code gives an HTTP
   // MCP request. Our MCP server is set once it runs (ClaudeSub.connect),
   // over its pipe: its secret URL is never on its command line
+  // On the user's own setup (ClaudeSub.own) it runs in that dir with its
+  // settings, CLAUDE.md and rules, plugins, skills, MCP servers and
+  // claude.ai connectors, as the user's Claude Code does there; Claude
+  // Code's own tools stay off but those (OWN), so our shell, files and
+  // agents are still the ones run; nothing is asked (bypassPermissions:
+  // the deny list still holds)
   export function options(ask: Ask, abort: AbortController, builtin: readonly string[]): Options {
-    const tools = WEB;
+    const own = ClaudeSub.own(ask);
+    const tools = own ? [...WEB, ...OWN] : WEB;
     const deny = [...builtin, ...MORE].filter((t) => !tools.includes(t));
+    const bare = own ? {} : { plugins: [], skills: [] };
     return {
       abortController        : abort,
-      env                    : ClaudeSub.env(),
-      cwd                    : DIR,
+      env                    : ClaudeSub.env(own),
+      cwd                    : own ? config.CLAUDE_HOME : DIR,
       model                  : ask.model,
       effort                 : ask.effort as Options["effort"],
       thinking               : { type: "adaptive", display: "summarized" },
@@ -315,19 +343,19 @@ export namespace ClaudeSub {
       tools,
       allowedTools           : [...tools, "mcp__unii"],
       disallowedTools        : deny,
-      permissionMode         : "dontAsk",
+      permissionMode         : own ? "bypassPermissions" : "dontAsk",
+      allowDangerouslySkipPermissions : own,
       mcpServers             : {},
-      strictMcpConfig        : true,
-      settingSources         : [],
-      plugins                : [],
-      skills                 : [],
+      strictMcpConfig        : !own,
+      settingSources         : own ? ["user", "project", "local"] : [],
+      ...bare,
       persistSession         : false,
       includePartialMessages : true,
       settings               : {
         disableBundledSkills      : true,
         disableWorkflows          : true,
         disableRemoteControl      : true,
-        disableClaudeAiConnectors : true,
+        disableClaudeAiConnectors : !own,
         enableArtifact            : false,
         permissions               : { deny },
       },
